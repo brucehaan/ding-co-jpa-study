@@ -8,6 +8,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @SpringBootTest // 스프링 부트의 모든 설정을 가져와서 테스트
 @Slf4j
 public class PersistenceContextTest {
@@ -212,6 +215,79 @@ public class PersistenceContextTest {
         } catch (Exception e) {
             tx.rollback();
             e.printStackTrace();
+        } finally {
+            em.close();
+        }
+    }
+
+    @Test
+    void 자바_컬렉션처럼_다루기_List편() {
+        System.out.println("=== ☕ 자바 List 실험 시작 ===");
+
+        // 1. 리스트 생성 (DB라고 상상하세요)
+        List<Member> list = new ArrayList<>();
+
+        // 2. 데이터 저장
+        Member member = new Member("OldName", Grade.BASIC);
+        list.add(member); // INSERT
+
+        // 3. 데이터 꺼내기 (SELECT)
+        // 리스트 안에 있는 객체의 참조값(주소)을 가져옵니다.
+        Member findMember = list.get(0);
+
+        // 4. 데이터 수정
+        System.out.println("-> 이름을 'NewName'으로 변경");
+        findMember.setName("NewName");
+
+        // 5. 다시 리스트에 넣나요? (중요!)
+        // list.add(findMember);  <-- 이런 짓 안 하죠?
+        // list.update(0, findMember); <-- 이런 메서드도 없습니다!
+
+        // 6. 검증
+        // 꺼낸 놈을 바꿨는데, 리스트 안에 있는 놈도 바뀌었을까?
+        Member storedMember = list.get(0);
+        System.out.println("리스트에 저장된 이름: " + storedMember.getName());
+
+        if ("NewName".equals(storedMember.getName())) {
+            System.out.println(">>> ✅ 당연히 바뀌어 있음! (참조값 공유)");
+        }
+    }
+
+    @Test
+    void 자바_컬렉션처럼_다루기_JPA편() {
+        System.out.println("=== 🚀 JPA 실험 시작 ===");
+
+        EntityManager em = emf.createEntityManager();
+        EntityTransaction tx = em.getTransaction();
+        tx.begin();
+
+        try {
+            // 1. 데이터 저장 (List.add와 비슷)
+            Member member = new Member("OldName", Grade.BASIC);
+            em.persist(member);
+            Long id = member.getId();
+
+            em.flush();
+            em.clear(); // (실험을 위해 DB에 반영하고 메모리 비움)
+
+            // 2. 데이터 꺼내기 (List.get과 비슷)
+            Member findMember = em.find(Member.class, id);
+
+            // 3. 데이터 수정
+            System.out.println("-> 이름을 'NewName'으로 변경");
+            findMember.setName("NewName");
+
+            // 4. 다시 저장하나요? (핵심!)
+            // em.persist(findMember); <-- 필요 없음! (List에도 다시 안 넣었잖아?)
+            // em.update(findMember);  <-- 이런 메서드 자체가 없음!
+
+            System.out.println("=== 🛑 커밋 직전 (자동 감지) ===");
+            tx.commit(); // 5. 커밋 (이때 JPA가 List처럼 동작해서 DB에 반영함)
+
+            System.out.println(">>> ✅ UPDATE 쿼리 자동 발생함!");
+
+        } catch (Exception e) {
+            tx.rollback();
         } finally {
             em.close();
         }

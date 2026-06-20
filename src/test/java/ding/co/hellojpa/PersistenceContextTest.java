@@ -292,4 +292,126 @@ public class PersistenceContextTest {
             em.close();
         }
     }
+
+    @Test
+    void 쓰기_지연_SQL_저장소_검증() {
+        EntityManager em = emf.createEntityManager();
+        EntityTransaction tx = em.getTransaction();
+        tx.begin(); // [트랜잭션 시작]
+
+        try {
+            System.out.println("=== 1. 저장 메서드(persist) 호출 시작 ===");
+
+            // ItemA 생성 (ID 직접 부여)
+            Item itemA = new Item(1L, "ItemA");
+            System.out.println("-> em.persist(itemA) 실행");
+            em.persist(itemA);
+            // 1차 캐시에 저장됨 + 쓰기 지연 SQL 저장소에 INSERT 쿼리 보관됨
+            // (아직 DB에는 아무 일도 안 일어남!)
+
+            // ItemB 생성
+            Item itemB = new Item(2L, "ItemB");
+            System.out.println("-> em.persist(itemB) 실행");
+            em.persist(itemB);
+            // 역시 저장소에 차곡차곡 쌓임
+
+            System.out.println("=== 2. 커밋 직전 (아직 쿼리 안 나감!) ===");
+
+            // 여기까지 콘솔을 보세요. insert 쿼리가 있나요? 없어야 정상입니다.
+
+            System.out.println("=== 3. 커밋 호출 (트럭 출발!) ===");
+            tx.commit(); // [이때 쿼리 2방이 한꺼번에 날아감!]
+
+            System.out.println("=== 4. 커밋 완료 ===");
+
+        } catch (Exception e) {
+            tx.rollback();
+            e.printStackTrace();
+        } finally {
+            em.close();
+        }
+    }
+
+    @Test
+    void 삭제후_재등록_실패_테스트() {
+        EntityManager em = emf.createEntityManager();
+        EntityTransaction tx = em.getTransaction();
+        tx.begin();
+
+        try {
+            // [준비] 'A'라는 이름을 가진 유저 미리 저장
+            UniqueMember memberA = new UniqueMember("A");
+            em.persist(memberA);
+            em.flush(); // DB에 반영
+            em.clear(); // 영속성 컨텍스트 비움
+
+            System.out.println("=== 💀 실패 실험 시작 ===");
+
+            // 1. 기존 'A' 유저 조회 및 삭제
+            UniqueMember findMember = em.find(UniqueMember.class, memberA.getId());
+            em.remove(findMember); // (Delete 쿼리 대기 중... 순위: 꼴찌)
+
+            // 2. 새로운 'A' 유저 등록
+            // 개발자 생각: "아까 지웠으니까 이름 'A' 써도 되겠지?"
+            UniqueMember newMember = new UniqueMember("A");
+            em.persist(newMember); // (Insert 쿼리 대기 중... 순위: 1등)
+
+            System.out.println("=== 커밋 직전 (여기서 에러 터짐) ===");
+
+            // 3. 커밋
+            // JPA의 실행 순서: Insert 먼저 -> Delete 나중
+            // 결과: Insert하는데 이미 'A'가 DB에 있네? -> Unique Constraint 위반! 💥
+            tx.commit();
+
+        } catch (Exception e) {
+            System.out.println(">>> ❌ 예외 발생! (예상대로 실패함)");
+            System.out.println("에러 메시지: " + e.getCause().getCause().getMessage());
+            // 보통 'Duplicate entry' 또는 'Unique index or primary key violation' 에러가 뜸
+            tx.rollback();
+        } finally {
+            em.close();
+        }
+    }
+
+    @Test
+    void 삭제후_재등록_성공_테스트() {
+        EntityManager em = emf.createEntityManager();
+        EntityTransaction tx = em.getTransaction();
+        tx.begin();
+
+        try {
+            // [준비] 'B'라는 이름을 가진 유저 미리 저장
+            UniqueMember memberB = new UniqueMember("B");
+            em.persist(memberB);
+            em.flush();
+            em.clear();
+
+            System.out.println("=== 🎉 성공 실험 시작 ===");
+
+            // 1. 기존 'B' 유저 삭제
+            UniqueMember findMember = em.find(UniqueMember.class, memberB.getId());
+            em.remove(findMember);
+
+            // ⭐️ [해결책] 여기서 강제로 DB에 DELETE 쿼리를 쏴버림!
+            System.out.println("-> 강제 flush 호출 (Delete 먼저 실행)");
+            em.flush();
+            // (DB 상태: 이제 'B'는 삭제되어서 없음)
+
+            // 2. 새로운 'B' 유저 등록
+            UniqueMember newMember = new UniqueMember("B");
+            em.persist(newMember);
+
+            // 3. 커밋 (이제 Insert만 남았음)
+            System.out.println("-> 커밋 호출");
+            tx.commit();
+
+            System.out.println(">>> ✅ 트랜잭션 정상 커밋 완료!");
+
+        } catch (Exception e) {
+            tx.rollback();
+            e.printStackTrace(); // 여기로 오면 안 됨
+        } finally {
+            em.close();
+        }
+    }
 }

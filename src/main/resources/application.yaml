@@ -1,6 +1,20 @@
 spring:
+  # (선택) H2 DB 웹 콘솔을 켜주세요 (눈으로 확인용)
+  # 접속 주소: http://localhost:8080/h2-console
+  h2:
+    console:
+      enabled: true
+
   jpa:
+    # 1. 콘솔에 나가는 SQL을 보여주세요
     show-sql: true
+
+    # 3. [핵심] 애플리케이션 시작 시점에 테이블을 어떻게 할까요?
+    # create: 기존 테이블을 다 삭제(DROP)하고 새로 만듭니다(CREATE).
+    hibernate:
+      ddl-auto: create
+
     properties:
       hibernate:
+        # 2. SQL을 한 줄로 쭉 뽑지 말고, 예쁘게 줄바꿈(Formatting) 해주세요
         format_sql: true

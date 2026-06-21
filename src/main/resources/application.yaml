@@ -18,3 +18,5 @@ spring:
       hibernate:
         # 2. SQL을 한 줄로 쭉 뽑지 말고, 예쁘게 줄바꿈(Formatting) 해주세요
         format_sql: true
+        jdbc:
+          batch_size: 50

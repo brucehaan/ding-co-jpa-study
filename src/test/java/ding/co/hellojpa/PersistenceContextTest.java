@@ -414,4 +414,37 @@ public class PersistenceContextTest {
             em.close();
         }
     }
+
+    @Test
+    void 시퀀스_최적화_검증_allocationSize_50() {
+        EntityManager em = emf.createEntityManager();
+        EntityTransaction tx = em.getTransaction();
+        tx.begin();
+
+        try {
+            System.out.println("============== 🚀 테스트 시작 ==============");
+
+            // 50명의 회원을 저장합니다.
+            for (int i = 1; i <= 50; i++) {
+                SequenceMember member = new SequenceMember("회원" + i);
+
+                // persist를 호출하는 순간, ID가 필요하므로 시퀀스를 찾습니다.
+                // 하지만 allocationSize=50 덕분에 매번 DB에 가지 않습니다.
+                em.persist(member);
+
+                System.out.println("-> 저장됨: member.id = " + member.getId());
+            }
+
+            System.out.println("============== 🛑 루프 종료 (커밋 전) ==============");
+
+            // 커밋 시점에 INSERT 쿼리가 한 번에(또는 배치로) 나갑니다.
+            tx.commit();
+
+        } catch (Exception e) {
+            tx.rollback();
+            e.printStackTrace();
+        } finally {
+            em.close();
+        }
+    }
 }

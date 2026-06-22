@@ -190,4 +190,74 @@ public class Week2PersistenceContextTest {
             em.close();
         }
     }
+
+    // ==========================================
+    // 5. 엔티티 생명주기: 비영속 -> 영속 -> 준영속 -> 삭제
+    // ==========================================
+    @Test
+    void 엔티티_생명주기_검증() {
+        EntityManager em = emf.createEntityManager();
+        EntityTransaction tx = em.getTransaction();
+        tx.begin();
+
+        try {
+            // 1. [비영속 상태] (Transient)
+            // 객체를 생성만 한 상태. JPA와 전혀 관계 없음.
+            System.out.println("=== 1. 비영속 상태 (New) ===");
+            Member member = new Member("LifeCycleMember", Grade.BASIC);
+
+            // 검증: 영속성 컨텍스트에 있니? -> 아니요(false)
+            boolean isManaged1 = em.contains(member);
+            System.out.println("관리 대상인가요? " + isManaged1); // false
+
+
+            // 2. [영속 상태] (Managed)
+            // 객체를 저장함. 이제부터 JPA가 관리함 (1차 캐시에 들어감)
+            System.out.println("=== 2. 영속 상태 (Managed) ===");
+            em.persist(member);
+
+            // 검증: 영속성 컨텍스트에 있니? -> 예(true)
+            boolean isManaged2 = em.contains(member);
+            System.out.println("관리 대상인가요? " + isManaged2); // true
+
+
+            // 3. [준영속 상태] (Detached)
+            // 영속성 컨텍스트에서 강제로 쫓아냄.
+            System.out.println("=== 3. 준영속 상태 (Detached) ===");
+            em.detach(member);
+
+            // 검증: 영속성 컨텍스트에 있니? -> 아니요(false)
+            boolean isManaged3 = em.contains(member);
+            System.out.println("관리 대상인가요? " + isManaged3); // false
+
+            // [실험] 준영속 상태에서 값을 바꾸면?
+            System.out.println("-> 이름 변경 시도 (DetachedMember)");
+            member.setName("DetachedMember");
+            // 결과: 비서(JPA)가 퇴근했으므로 변경 감지(Dirty Checking)가 동작하지 않음!
+            // 즉, DB에 UPDATE 쿼리가 안 나감.
+
+
+            // 4. [삭제 상태] (Removed)
+            // 삭제를 하려면 다시 영속 상태에 있어야 함 (find or merge)
+            System.out.println("=== 4. 삭제 상태 (Removed) ===");
+
+            // 다시 조회 (DB -> 영속성 컨텍스트)
+            Member findMember = em.find(Member.class, member.getId());
+
+            em.remove(findMember); // 삭제 요청
+            System.out.println("-> 삭제 요청됨 (커밋 시 Delete 쿼리 나감)");
+
+            // 참고: remove를 호출해도 커밋 전까지는 1차 캐시에는 남아있을 수 있지만,
+            // 실무적으로는 "사용 불가" 상태로 봅니다.
+
+            tx.commit();
+            System.out.println("=== 커밋 완료 ===");
+
+        } catch (Exception e) {
+            tx.rollback();
+            e.printStackTrace();
+        } finally {
+            em.close();
+        }
+    }
 }

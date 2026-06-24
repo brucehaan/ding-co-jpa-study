@@ -20,3 +20,4 @@ spring:
         format_sql: true
         jdbc:
           batch_size: 50
+    open-in-view: false

@@ -17,5 +17,5 @@ public class EmbeddedMember {
     private Period workPeriod;
 
     @Embedded
-    private Address homeAddress;
+    private ImmutableAddress homeAddress;
 }

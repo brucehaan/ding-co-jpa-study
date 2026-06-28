@@ -14,8 +14,10 @@ public class QuerydslMember {
     @Id @GeneratedValue
     private Long id;
     private String username;
+    private int age;
 
-    public QuerydslMember(String username) {
+    public QuerydslMember(String username, int age) {
         this.username = username;
+        this.age = age;
     }
 }

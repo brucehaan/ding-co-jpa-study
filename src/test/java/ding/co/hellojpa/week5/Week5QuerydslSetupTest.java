@@ -25,7 +25,7 @@ public class Week5QuerydslSetupTest {
     @Test
     void QueryDSL_환경설정_및_동작_테스트() {
         // 1. [준비] 데이터 저장
-        QuerydslMember member = new QuerydslMember("hello_querydsl");
+        QuerydslMember member = new QuerydslMember("hello_querydsl", 20);
         em.persist(member);
 
         em.flush();
